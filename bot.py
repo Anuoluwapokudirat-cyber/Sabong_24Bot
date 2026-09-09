@@ -30,7 +30,8 @@ HELP_TEXT = (
 )
 
 # --- Command Handlers ---
-def start(bot, update):
+def start(update, context):
+    """Send a welcome message with inline keyboard."""
     keyboard = [
         [InlineKeyboardButton("ព័ត៌មានប្រចាំថ្ងៃ 📅", callback_data="daily")],
         [InlineKeyboardButton("បញ្ជីសត្វ 📋", callback_data="list_animals")],
@@ -39,57 +40,69 @@ def start(bot, update):
     reply_markup = InlineKeyboardMarkup(keyboard)
     update.message.reply_text(WELCOME_TEXT, reply_markup=reply_markup)
 
-def daily(bot, update):
+def daily(update, context):
+    """Send today's animal information."""
     animal = get_daily_content()
     if animal:
-        caption = f"**{animal['name_kh']}**\n\n{animal['description']}"
+        caption = f"*{animal['name_kh']}*\n\n{animal['description']}"
         if 'image_path' in animal and animal['image_path']:
             try:
                 with open(animal['image_path'], 'rb') as photo:
                     update.message.reply_photo(photo=photo, caption=caption)
-            except:
+            except Exception as e:
+                logger.error(f"Error sending image: {e}")
                 update.message.reply_text(caption + "\n\n(រូបភាពមិនមាន)")
         else:
             update.message.reply_text(caption)
     else:
         update.message.reply_text("មិនមានព័ត៌មានសម្រាប់ថ្ងៃនេះទេ!")
 
-def list_animals(bot, update):
+def list_animals(update, context):
+    """Show a list of all available animals."""
     keyboard = []
     for key, animal in ANIMALS.items():
         keyboard.append([InlineKeyboardButton(animal['name_kh'], callback_data=f"animal_{key}")])
     reply_markup = InlineKeyboardMarkup(keyboard)
     update.message.reply_text("សូមជ្រើសរើសសត្វដែលអ្នកចង់ដឹង៖", reply_markup=reply_markup)
 
-def animal_detail(bot, update, animal_key):
+def animal_detail(update, context, animal_key):
+    """Send detailed information about a specific animal."""
     animal = ANIMALS.get(animal_key)
     if animal:
-        caption = f"**{animal['name_kh']}**\n\n{animal['description']}"
+        caption = f"*{animal['name_kh']}*\n\n{animal['description']}"
         update.message.reply_text(caption)
     else:
         update.message.reply_text("រកមិនឃើញសត្វនេះទេ!")
 
-def button_handler(bot, update):
+def button_handler(update, context):
+    """Handle callback queries from inline buttons."""
     query = update.callback_query
     query.answer()
     
     data = query.data
     if data == "daily":
-        daily(bot, query.message)
+        # Get the original message and call daily
+        daily(query.message, context)
     elif data == "list_animals":
-        list_animals(bot, query.message)
+        list_animals(query.message, context)
     elif data == "help":
         query.edit_message_text(HELP_TEXT)
     elif data.startswith("animal_"):
         animal_key = data.split("_", 1)[1]
-        animal_detail(bot, query.message, animal_key)
+        animal = ANIMALS.get(animal_key)
+        if animal:
+            caption = f"*{animal['name_kh']}*\n\n{animal['description']}"
+            query.edit_message_text(caption)
+        else:
+            query.edit_message_text("រកមិនឃើញសត្វនេះទេ!")
 
-def error_handler(bot, update, error):
-    logger.error(f"Update {update} caused error {error}")
+def error_handler(update, context):
+    """Handle errors."""
+    logger.error(f"Update {update} caused error {context.error}")
 
 # --- Main Function ---
 def main():
-    # Create the Updater (without use_context for compatibility)
+    # Create the Updater
     updater = Updater(TOKEN)
     dp = updater.dispatcher
     
