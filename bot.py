@@ -1,7 +1,7 @@
 import os
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
 
 # --- Import your animal data ---
 from animals_data import ANIMALS, get_daily_content
@@ -30,7 +30,7 @@ HELP_TEXT = (
 )
 
 # --- Command Handlers ---
-def start(update: Update, context: CallbackContext):
+def start(bot, update):
     keyboard = [
         [InlineKeyboardButton("ព័ត៌មានប្រចាំថ្ងៃ 📅", callback_data="daily")],
         [InlineKeyboardButton("បញ្ជីសត្វ 📋", callback_data="list_animals")],
@@ -39,7 +39,7 @@ def start(update: Update, context: CallbackContext):
     reply_markup = InlineKeyboardMarkup(keyboard)
     update.message.reply_text(WELCOME_TEXT, reply_markup=reply_markup)
 
-def daily(update: Update, context: CallbackContext):
+def daily(bot, update):
     animal = get_daily_content()
     if animal:
         caption = f"**{animal['name_kh']}**\n\n{animal['description']}"
@@ -47,21 +47,21 @@ def daily(update: Update, context: CallbackContext):
             try:
                 with open(animal['image_path'], 'rb') as photo:
                     update.message.reply_photo(photo=photo, caption=caption)
-            except FileNotFoundError:
+            except:
                 update.message.reply_text(caption + "\n\n(រូបភាពមិនមាន)")
         else:
             update.message.reply_text(caption)
     else:
         update.message.reply_text("មិនមានព័ត៌មានសម្រាប់ថ្ងៃនេះទេ!")
 
-def list_animals(update: Update, context: CallbackContext):
+def list_animals(bot, update):
     keyboard = []
     for key, animal in ANIMALS.items():
         keyboard.append([InlineKeyboardButton(animal['name_kh'], callback_data=f"animal_{key}")])
     reply_markup = InlineKeyboardMarkup(keyboard)
     update.message.reply_text("សូមជ្រើសរើសសត្វដែលអ្នកចង់ដឹង៖", reply_markup=reply_markup)
 
-def animal_detail(update: Update, context: CallbackContext, animal_key: str):
+def animal_detail(bot, update, animal_key):
     animal = ANIMALS.get(animal_key)
     if animal:
         caption = f"**{animal['name_kh']}**\n\n{animal['description']}"
@@ -69,28 +69,28 @@ def animal_detail(update: Update, context: CallbackContext, animal_key: str):
     else:
         update.message.reply_text("រកមិនឃើញសត្វនេះទេ!")
 
-def button_handler(update: Update, context: CallbackContext):
+def button_handler(bot, update):
     query = update.callback_query
     query.answer()
     
     data = query.data
     if data == "daily":
-        daily(update, context)
+        daily(bot, query.message)
     elif data == "list_animals":
-        list_animals(update, context)
+        list_animals(bot, query.message)
     elif data == "help":
         query.edit_message_text(HELP_TEXT)
     elif data.startswith("animal_"):
         animal_key = data.split("_", 1)[1]
-        animal_detail(update, context, animal_key)
+        animal_detail(bot, query.message, animal_key)
 
-def error_handler(update, context):
-    logger.error(f"Update {update} caused error {context.error}")
+def error_handler(bot, update, error):
+    logger.error(f"Update {update} caused error {error}")
 
 # --- Main Function ---
 def main():
-    # Create the Updater and pass it your bot's token
-    updater = Updater(TOKEN, use_context=True)
+    # Create the Updater (without use_context for compatibility)
+    updater = Updater(TOKEN)
     dp = updater.dispatcher
     
     # Register command handlers
